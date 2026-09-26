@@ -1,0 +1,9 @@
+/node_modules
+/vendor
+/js
+/build
+/.phpunit.result.cache
+/.php-cs-fixer.cache
+*.log
+.DS_Store
+.claude/

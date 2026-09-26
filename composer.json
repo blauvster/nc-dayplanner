@@ -1,0 +1,21 @@
+{
+    "name": "nextcloud/dayplanner",
+    "description": "Schedule Deck cards on a day-planner timeline",
+    "license": "AGPL-3.0-or-later",
+    "autoload": {
+        "psr-4": {
+            "OCA\\DayPlanner\\": "lib/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "classmap-authoritative": true,
+        "platform": {
+            "php": "8.1"
+        }
+    },
+    "scripts": {
+        "post-install-cmd": "composer dump-autoload",
+        "post-update-cmd": "composer dump-autoload"
+    }
+}
