@@ -52,8 +52,7 @@ Run from any machine with `docker` access to the AIO host:
 ```sh
 git clone https://github.com/blauvster/nc-dayplanner.git
 cd nc-dayplanner
-./scripts/install-aio.sh                 # assumes the default container name
-./scripts/install-aio.sh my-container    # or pass it explicitly
+./scripts/install-aio.sh
 ```
 
 This builds the app, copies it into the container's

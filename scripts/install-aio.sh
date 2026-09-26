@@ -4,23 +4,20 @@
 # host (it doesn't need to be the host itself).
 #
 # Usage:
-#   ./scripts/install-aio.sh [container-name]
+#   ./scripts/install-aio.sh
 #
-# Defaults to the standard AIO container name; pass a different one if
-# you've renamed it, or set the CONTAINER environment variable. Re-run
-# this same command to pick up updates after a `git pull`.
+# Re-run this same command to pick up updates after a `git pull`.
 set -e
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-CONTAINER="${1:-${CONTAINER:-nextcloud-aio-nextcloud}}"
+CONTAINER=nextcloud-aio-nextcloud
 APP_ID=dayplanner
 TARGET="/var/www/html/custom_apps/$APP_ID"
 
 command -v docker >/dev/null 2>&1 || { echo "docker is required on PATH." >&2; exit 1; }
 docker ps --format '{{.Names}}' | grep -qx "$CONTAINER" || {
-	echo "No running container named '$CONTAINER'." >&2
-	echo "Usage: $0 [container-name]" >&2
+	echo "No running container named '$CONTAINER' - is Nextcloud AIO running?" >&2
 	exit 1
 }
 
