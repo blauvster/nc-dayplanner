@@ -43,7 +43,16 @@ a runtime requirement that it's installed and enabled.
 
 This app isn't in the App Store - install it from source. Either script
 below builds the frontend (`npm`) and PHP autoloader (`composer`), so
-have Node.js/npm and Composer available on the machine you run them from.
+have these available on the machine you run them from (not necessarily
+the Nextcloud server itself - for the AIO script, any machine with
+`docker` access to the AIO host works):
+
+- [Node.js](https://nodejs.org/) ^20 and npm ^10
+- [Composer](https://getcomposer.org/) 2.x
+- `git`, to clone the repo
+
+Nextcloud itself needs PHP 8.1+ to run the app (see `composer.json`'s
+`platform.php`), same as any current Nextcloud release.
 
 ### Nextcloud AIO
 
