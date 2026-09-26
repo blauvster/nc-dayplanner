@@ -1,20 +1,25 @@
 <template>
-	<ul class="board-list">
-		<li v-if="boardsStore.loading" class="board-list__loading">
-			<NcLoadingIcon :size="20" />
-		</li>
-		<li v-else-if="boardsStore.boards.length === 0" class="board-list__empty">
-			No boards found.
-		</li>
-		<li v-for="board in boardsStore.boards" :key="board.id">
-			<NcCheckboxRadioSwitch
-				:model-value="boardsStore.selectedIds.includes(board.id)"
-				@update:model-value="boardsStore.toggleBoard(board.id)">
-				<span class="board-list__swatch" :style="{ backgroundColor: '#' + board.color }" />
-				{{ board.title }}
-			</NcCheckboxRadioSwitch>
-		</li>
-	</ul>
+	<div>
+		<h3 class="board-list__title">
+			Boards
+		</h3>
+		<ul class="board-list">
+			<li v-if="boardsStore.loading" class="board-list__loading">
+				<NcLoadingIcon :size="20" />
+			</li>
+			<li v-else-if="boardsStore.boards.length === 0" class="board-list__empty">
+				No boards found.
+			</li>
+			<li v-for="board in boardsStore.boards" :key="board.id">
+				<NcCheckboxRadioSwitch
+					:model-value="boardsStore.selectedIds.includes(board.id)"
+					@update:model-value="boardsStore.toggleBoard(board.id)">
+					<span class="board-list__swatch" :style="{ backgroundColor: '#' + board.color }" />
+					{{ board.title }}
+				</NcCheckboxRadioSwitch>
+			</li>
+		</ul>
+	</div>
 </template>
 
 <script>
@@ -35,6 +40,11 @@ export default {
 </script>
 
 <style scoped>
+.board-list__title {
+	font-weight: bold;
+	margin: 8px;
+}
+
 .board-list {
 	padding: 8px;
 }

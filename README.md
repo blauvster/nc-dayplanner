@@ -37,8 +37,7 @@ App id: `dayplanner`. Targets Nextcloud 32+ and the latest Deck.
     Calendar app is enabled, a link to that day in Calendar. Deck's
     board-calendars turned out not to be registered through this API at
     all, so the "exclude Deck's own calendars" concern from plan.md
-    doesn't actually apply here - nothing to filter out. All-day events
-    are not shown at all - see Known Issues.
+    doesn't actually apply here - nothing to filter out.
   - **Personal settings**: working hours, snap step and default
     duration are a real settings page (Settings → Personal → Day
     Planner) via a `PreferencesService` + REST endpoints, wired into
@@ -71,27 +70,68 @@ App id: `dayplanner`. Targets Nextcloud 32+ and the latest Deck.
     server actually has it installed (confirmed: no Deck card activity
     shows up there either). There's nothing to integrate against, so
     this isn't being built.
+- **Phase 5 (polish)**: mobile layout pass. A custom toolbar (prev/next/
+  today plus an `NcActions` popup for Day/3 days/Week, replacing
+  FullCalendar's own button row) with a 1-day step for the 3-day view's
+  prev/next instead of jumping a full 3 days; the all-day row defaults
+  to one hour-row's height and grows for more events, and can no longer
+  be dropped onto (cards are scheduled by time range, which an all-day
+  slot can't represent); the left panel is reordered (Backlog - cards,
+  then filters - first, Boards/Calendars below, with a "Boards" heading
+  to match "Calendars"); and the app icon (`img/app.svg` /
+  `img/app-dark.svg`) follows the same convention as Files/Calendar/Deck
+  (white for the main icon, black for the explicit dark variant) instead
+  of a fixed color that wasn't visible in one theme or the other.
+  Keyboard shortcuts and an automated test suite (PHPUnit/Vitest) are
+  not done.
 
-## Known issues
+## Known issues (resolved)
 
-- **No all-day row.** `allDaySlot` is off in `Timeline.vue`. FullCalendar's
-  all-day row resisted every attempt to keep it sized to its actual content
-  once events loaded - it would balloon to a few hundred pixels of empty
-  space above the hourly grid instead of staying compact. Tried, in order:
-  a plain CSS `min-height` override, the same with `!important` (FullCalendar
-  sets the real height inline via JS row-balancing, so a static stylesheet
-  rule can't reliably outrank it), forcing the inline style back down via JS
-  on `eventsSet`/`datesSet`, and finally a `MutationObserver` reacting to
-  FullCalendar's own DOM changes so the correction couldn't lose a timing
-  race - none of it stuck. The row-balancing logic appears to run somewhere
-  we don't have a hook into (or on every animation frame, rather than in
-  response to a DOM mutation we can observe). Net effect: all-day calendar
-  events are fetched but filtered out of what's passed to FullCalendar
-  (`Timeline.vue`'s `calendarEvents` computed) rather than shown badly.
-  Revisit if a future FullCalendar version changes this, or if someone
-  finds the actual mechanism (worth checking FullCalendar's own GitHub
-  issues for `slotMinTime`/`allDaySlot` + row height, which weren't
-  searched during this pass).
+- **All-day row / header-row gap (fixed).** The all-day row used to balloon
+  to a few hundred pixels of empty space once events loaded, and even
+  disabling its content left the same gap between the day-header row and
+  the first hour slot. Several rounds of CSS `min-height` overrides,
+  `!important`, JS-forced inline styles, and a `MutationObserver` reacting
+  to FullCalendar's own DOM changes all failed to shrink either row. The
+  actual cause turned out to be `height: '100%'`: FullCalendar's
+  `'100%'`/`'auto'` sizing measures its own rendered layout via a
+  ResizeObserver and feeds that back into another layout pass, and inside
+  Nextcloud's percentage/flex-based container chain (rather than a
+  fixed-pixel one) that self-referential measurement overshoots, handing
+  extra height to the header/all-day rows rather than the actual body
+  grid - not a row-content problem at all, which is why every content-level
+  fix missed it. The fix was to stop asking FullCalendar to measure itself:
+  `Timeline.vue` now measures `.timeline`'s real content-box height with a
+  `ResizeObserver` and passes that in as a plain pixel number via `height`,
+  and both `allDaySlot` and the day-header row are back on with no special
+  handling needed.
+
+Two other structural bugs surfaced during the mobile polish pass, both
+found by inspecting the live DOM with a headless browser (Playwright)
+rather than guessing from source reading, since the earlier CSS-only
+approach to the all-day row above had such a poor hit rate:
+
+- **Double `#content` wrapper (top gap, bottom/right clipping).**
+  `templates/index.php` hand-rolled `<div id="content"
+  class="app-dayplanner">` around the Vue mount point - standard older
+  Nextcloud app boilerplate. But `App.vue`'s root is `<NcContent
+  app-name="dayplanner">`, and `@nextcloud/vue`'s `NcContent` component
+  *also* renders that same `#content` shell itself. Nested one inside
+  the other, the inner copy's positioning stacked on top of the outer
+  one's, doubling the top offset (50px header height counted twice) and
+  pushing the bottom and right edges out by the same amount, clipping
+  them. Fix: the template just provides a plain mount `<div>`; `NcContent`
+  owns `#content` entirely, matching how Nextcloud's own Calendar app
+  does it.
+- **Card editor sidebar rendered off-screen on mobile.** `NcAppSidebar`
+  sets `--app-sidebar-width: 100vw` below 512px, which assumes `#content`
+  itself goes edge-to-edge when a sidebar is open (a `with-sidebar--full`
+  mode). This app's `#content` keeps its normal side insets instead, so
+  `100vw` overshot by exactly those insets on both sides - the sidebar
+  (and its title) rendered a few pixels off the left edge of the screen.
+  Fixed with a direct `width: 100%` override in `CardEditor.vue` at that
+  breakpoint, sizing it to the actual available space instead of the raw
+  viewport.
 
 Notable bug caught and fixed along the way: adding a second Vite entry
 point (for the settings page) tripped up

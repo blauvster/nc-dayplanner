@@ -2,9 +2,9 @@
 	<NcContent app-name="dayplanner">
 		<NcAppNavigation>
 			<template #list>
+				<Backlog @select="selectedCardId = $event" @quick-add="openQuickAdd()" />
 				<BoardList />
 				<CalendarList />
-				<Backlog @select="selectedCardId = $event" @quick-add="openQuickAdd()" />
 			</template>
 		</NcAppNavigation>
 		<NcAppContent>

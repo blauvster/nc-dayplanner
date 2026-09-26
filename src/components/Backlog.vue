@@ -7,6 +7,22 @@
 			</NcButton>
 		</div>
 
+		<div ref="listEl" class="backlog__list-wrapper">
+			<NcLoadingIcon v-if="cardsStore.loading" :size="20" />
+			<NcEmptyContent v-else-if="filteredCards.length === 0" description="Nothing to schedule" />
+			<ul v-else class="backlog__list">
+				<li
+					v-for="entry in filteredCards"
+					:key="entry.card.id"
+					class="backlog-card"
+					:data-event="eventData(entry)"
+					:style="{ borderLeftColor: '#' + boardColor(entry.boardId) }"
+					@click="$emit('select', entry.card.id)">
+					{{ entry.card.title }}
+				</li>
+			</ul>
+		</div>
+
 		<div class="backlog__filters">
 			<NcSelect
 				v-model="stackFilter"
@@ -26,22 +42,6 @@
 			<NcCheckboxRadioSwitch type="switch" :model-value="dueSoonOnly" @update:model-value="dueSoonOnly = $event">
 				Due soon
 			</NcCheckboxRadioSwitch>
-		</div>
-
-		<div ref="listEl" class="backlog__list-wrapper">
-			<NcLoadingIcon v-if="cardsStore.loading" :size="20" />
-			<NcEmptyContent v-else-if="filteredCards.length === 0" description="Nothing to schedule" />
-			<ul v-else class="backlog__list">
-				<li
-					v-for="entry in filteredCards"
-					:key="entry.card.id"
-					class="backlog-card"
-					:data-event="eventData(entry)"
-					:style="{ borderLeftColor: '#' + boardColor(entry.boardId) }"
-					@click="$emit('select', entry.card.id)">
-					{{ entry.card.title }}
-				</li>
-			</ul>
 		</div>
 	</div>
 </template>
@@ -175,7 +175,7 @@ export default {
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
-	margin-bottom: 12px;
+	margin-top: 12px;
 }
 
 .backlog__list {

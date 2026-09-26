@@ -5,6 +5,4 @@
 \OCP\Util::addScript('dayplanner', 'dayplanner-main');
 ?>
 
-<div id="content" class="app-dayplanner">
-	<div id="dayplanner-app"></div>
-</div>
+<div id="dayplanner-app"></div>

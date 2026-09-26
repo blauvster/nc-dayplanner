@@ -315,6 +315,25 @@ export default {
 }
 </script>
 
+<style>
+/* NcAppSidebar goes full-width on narrow screens via a CSS var
+   (--app-sidebar-width: 100vw), which assumes #content itself expands
+   edge-to-edge when a sidebar is open (the "with-sidebar--full" mode).
+   This app's #content keeps its normal side insets instead, so 100vw
+   overshoots by exactly those insets on both sides - the sidebar (and
+   its header title) rendered a few pixels off the left edge of the
+   screen, clipping it. Overriding the resolved width directly, rather
+   than the var, sizes it to the actual available space regardless of
+   which mode #content is in. Unscoped deliberately: .app-sidebar is
+   NcAppSidebar's own root element, which scoped :deep() can't reach.
+*/
+@media only screen and (max-width: 512px) {
+	.app-sidebar {
+		width: 100% !important;
+	}
+}
+</style>
+
 <style scoped>
 .card-editor {
 	display: flex;
