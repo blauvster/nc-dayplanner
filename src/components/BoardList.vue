@@ -1,9 +1,9 @@
 <template>
-	<div>
-		<h3 class="board-list__title">
+	<details class="board-list" open>
+		<summary class="board-list__title">
 			Boards
-		</h3>
-		<ul class="board-list">
+		</summary>
+		<ul>
 			<li v-if="boardsStore.loading" class="board-list__loading">
 				<NcLoadingIcon :size="20" />
 			</li>
@@ -19,7 +19,7 @@
 				</NcCheckboxRadioSwitch>
 			</li>
 		</ul>
-	</div>
+	</details>
 </template>
 
 <script>
@@ -40,13 +40,13 @@ export default {
 </script>
 
 <style scoped>
-.board-list__title {
-	font-weight: bold;
-	margin: 8px;
-}
-
 .board-list {
 	padding: 8px;
+}
+
+.board-list__title {
+	font-weight: bold;
+	cursor: pointer;
 }
 
 .board-list__loading {

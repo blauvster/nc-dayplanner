@@ -23,26 +23,41 @@
 			</ul>
 		</div>
 
-		<div class="backlog__filters">
-			<NcSelect
-				v-model="stackFilter"
-				:options="stackOptions"
-				label="label"
-				:reduce="(option) => option.value"
-				placeholder="All lists" />
-			<NcSelect
-				v-model="labelFilter"
-				:options="labelOptions"
-				label="label"
-				:reduce="(option) => option.value"
-				placeholder="All labels" />
+		<details class="backlog__filters">
+			<summary class="backlog__filters-summary">
+				Filters
+			</summary>
+			<div v-if="stackOptions.length" class="backlog__filter-group">
+				<div class="backlog__filter-group-title">
+					Lists
+				</div>
+				<NcCheckboxRadioSwitch
+					v-for="option in stackOptions"
+					:key="option.value"
+					:model-value="stackFilters.includes(option.value)"
+					@update:model-value="toggleStackFilter(option.value)">
+					{{ option.label }}
+				</NcCheckboxRadioSwitch>
+			</div>
+			<div v-if="labelOptions.length" class="backlog__filter-group">
+				<div class="backlog__filter-group-title">
+					Labels
+				</div>
+				<NcCheckboxRadioSwitch
+					v-for="option in labelOptions"
+					:key="option.value"
+					:model-value="labelFilters.includes(option.value)"
+					@update:model-value="toggleLabelFilter(option.value)">
+					{{ option.label }}
+				</NcCheckboxRadioSwitch>
+			</div>
 			<NcCheckboxRadioSwitch type="switch" :model-value="assignedToMeOnly" @update:model-value="assignedToMeOnly = $event">
 				Assigned to me
 			</NcCheckboxRadioSwitch>
 			<NcCheckboxRadioSwitch type="switch" :model-value="dueSoonOnly" @update:model-value="dueSoonOnly = $event">
 				Due soon
 			</NcCheckboxRadioSwitch>
-		</div>
+		</details>
 	</div>
 </template>
 
@@ -52,7 +67,7 @@ import NcButton from '@nextcloud/vue/components/NcButton'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
-import NcSelect from '@nextcloud/vue/components/NcSelect'
+import { loadSessionState, saveSessionState } from '../services/sessionState.js'
 import { useBoardsStore } from '../store/boards.js'
 import { useCardsStore } from '../store/cards.js'
 
@@ -65,7 +80,6 @@ export default {
 		NcCheckboxRadioSwitch,
 		NcEmptyContent,
 		NcLoadingIcon,
-		NcSelect,
 	},
 	emits: ['select', 'quick-add'],
 	setup() {
@@ -75,11 +89,12 @@ export default {
 		}
 	},
 	data() {
+		const saved = loadSessionState('backlogFilters', {})
 		return {
-			stackFilter: null,
-			labelFilter: null,
-			assignedToMeOnly: false,
-			dueSoonOnly: false,
+			stackFilters: saved.stackFilters ?? [],
+			labelFilters: saved.labelFilters ?? [],
+			assignedToMeOnly: saved.assignedToMeOnly ?? false,
+			dueSoonOnly: saved.dueSoonOnly ?? false,
 		}
 	},
 	computed: {
@@ -108,10 +123,10 @@ export default {
 			const now = Date.now()
 			const dueSoonCutoff = now + DUE_SOON_HOURS * 3600000
 			return this.cardsStore.backlogCards.filter(({ card, stackId }) => {
-				if (this.stackFilter !== null && stackId !== this.stackFilter) {
+				if (this.stackFilters.length && !this.stackFilters.includes(stackId)) {
 					return false
 				}
-				if (this.labelFilter !== null && !card.labels?.some((label) => label.id === this.labelFilter)) {
+				if (this.labelFilters.length && !card.labels?.some((label) => this.labelFilters.includes(label.id))) {
 					return false
 				}
 				if (this.assignedToMeOnly && !card.assignedUsers?.some((a) => a.participant?.uid === this.currentUserId)) {
@@ -129,6 +144,12 @@ export default {
 				return true
 			})
 		},
+	},
+	watch: {
+		stackFilters: 'persistFilters',
+		labelFilters: 'persistFilters',
+		assignedToMeOnly: 'persistFilters',
+		dueSoonOnly: 'persistFilters',
 	},
 	mounted() {
 		this.draggable = new Draggable(this.$refs.listEl, {
@@ -149,6 +170,24 @@ export default {
 				duration: '00:30',
 				backgroundColor: '#' + this.boardColor(entry.boardId),
 				extendedProps: { cardId: entry.card.id },
+			})
+		},
+		toggleStackFilter(value) {
+			this.stackFilters = this.stackFilters.includes(value)
+				? this.stackFilters.filter((v) => v !== value)
+				: [...this.stackFilters, value]
+		},
+		toggleLabelFilter(value) {
+			this.labelFilters = this.labelFilters.includes(value)
+				? this.labelFilters.filter((v) => v !== value)
+				: [...this.labelFilters, value]
+		},
+		persistFilters() {
+			saveSessionState('backlogFilters', {
+				stackFilters: this.stackFilters,
+				labelFilters: this.labelFilters,
+				assignedToMeOnly: this.assignedToMeOnly,
+				dueSoonOnly: this.dueSoonOnly,
 			})
 		},
 	},
@@ -172,10 +211,22 @@ export default {
 }
 
 .backlog__filters {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
 	margin-top: 12px;
+}
+
+.backlog__filters > :not(summary) {
+	margin-top: 6px;
+}
+
+.backlog__filters-summary {
+	font-weight: bold;
+	cursor: pointer;
+}
+
+.backlog__filter-group-title {
+	color: var(--color-text-maxcontrast);
+	font-size: 12px;
+	margin-top: 4px;
 }
 
 .backlog__list {

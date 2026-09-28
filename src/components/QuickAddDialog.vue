@@ -38,6 +38,7 @@ import NcDialog from '@nextcloud/vue/components/NcDialog'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import DurationInput from './DurationInput.vue'
+import { loadSessionState, saveSessionState } from '../services/sessionState.js'
 import { useBoardsStore } from '../store/boards.js'
 import { useCardsStore } from '../store/cards.js'
 import { usePreferencesStore } from '../store/preferences.js'
@@ -98,14 +99,28 @@ export default {
 			}
 		},
 		selectedBoardId(boardId) {
+			// Only fall back to the first stack if the current one doesn't
+			// belong to the new board - reset() relies on this to restore a
+			// remembered board+stack pair without this watcher (which fires
+			// after reset() has already set both) clobbering the stack part.
 			const stacks = this.cardsStore.stacksByBoard[boardId] ?? []
-			this.selectedStackId = stacks[0]?.id ?? null
+			if (!stacks.some((stack) => stack.id === this.selectedStackId)) {
+				this.selectedStackId = stacks[0]?.id ?? null
+			}
 		},
 	},
 	methods: {
 		reset() {
 			this.title = ''
-			this.selectedBoardId = this.boardsStore.selectedBoards[0]?.id ?? null
+			const lastDestination = loadSessionState('lastQuickAddDestination', {})
+			const availableBoardIds = this.boardsStore.selectedBoards.map((board) => board.id)
+			this.selectedBoardId = availableBoardIds.includes(lastDestination.boardId)
+				? lastDestination.boardId
+				: this.boardsStore.selectedBoards[0]?.id ?? null
+			const stacks = this.cardsStore.stacksByBoard[this.selectedBoardId] ?? []
+			this.selectedStackId = stacks.some((stack) => stack.id === lastDestination.stackId)
+				? lastDestination.stackId
+				: stacks[0]?.id ?? null
 			if (this.initialStart && this.initialEnd) {
 				this.durationMinutes = Math.max(1, Math.round((this.initialEnd - this.initialStart) / 60000))
 			} else {
@@ -124,6 +139,10 @@ export default {
 				title: this.title.trim(),
 				startdate,
 				duedate,
+			})
+			saveSessionState('lastQuickAddDestination', {
+				boardId: this.selectedBoardId,
+				stackId: this.selectedStackId,
 			})
 			this.$emit('created', card)
 			this.$emit('update:open', false)

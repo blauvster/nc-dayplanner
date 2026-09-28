@@ -1,6 +1,8 @@
 <template>
-	<div v-if="calendarsStore.calendars.length" class="calendar-list">
-		<h3 class="calendar-list__title">Calendars</h3>
+	<details v-if="calendarsStore.calendars.length" class="calendar-list" open>
+		<summary class="calendar-list__title">
+			Calendars
+		</summary>
 		<NcCheckboxRadioSwitch
 			type="switch"
 			:model-value="calendarsStore.hideAll"
@@ -17,7 +19,7 @@
 				</NcCheckboxRadioSwitch>
 			</li>
 		</ul>
-	</div>
+	</details>
 </template>
 
 <script>
@@ -42,7 +44,8 @@ export default {
 
 .calendar-list__title {
 	font-weight: bold;
-	margin: 8px 0;
+	cursor: pointer;
+	margin-bottom: 8px;
 }
 
 .calendar-list__swatch {
