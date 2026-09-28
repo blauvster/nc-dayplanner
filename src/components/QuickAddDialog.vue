@@ -88,7 +88,7 @@ export default {
 		buttons() {
 			return [
 				{ label: 'Cancel', callback: () => this.$emit('update:open', false) },
-				{ label: 'Add', variant: 'primary', callback: this.onConfirm },
+				{ label: 'Add', variant: 'primary', disabled: !this.title.trim(), callback: this.onConfirm },
 			]
 		},
 	},

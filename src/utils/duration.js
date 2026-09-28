@@ -1,7 +1,8 @@
 /**
  * Duration parsing/formatting per plan.md section 2: accepts "90m", "1h30",
- * "1:30" or "1.5h", plus a bare number of minutes. Returns whole minutes,
- * or null if the text doesn't parse or isn't greater than zero.
+ * "1:30" or "1.5h", plus days ("1d", "1d2h", "1d 2h 30m", "1.5d") and a bare
+ * number of minutes. Returns whole minutes, or null if the text doesn't
+ * parse or isn't greater than zero.
  */
 export function parseDuration(input) {
 	if (input === null || input === undefined) {
@@ -20,9 +21,12 @@ export function parseDuration(input) {
 	}
 
 	if (minutes === null) {
-		match = text.match(/^(\d+(?:\.\d+)?)h\s*(\d{1,2})?m?$/)
-		if (match) {
-			minutes = Math.round(parseFloat(match[1]) * 60) + (match[2] ? parseInt(match[2], 10) : 0)
+		match = text.match(/^(?:(\d+(?:\.\d+)?)d)?\s*(?:(\d+(?:\.\d+)?)h)?\s*(\d{1,2})?m?$/)
+		if (match && (match[1] || match[2] || match[3])) {
+			const days = match[1] ? parseFloat(match[1]) : 0
+			const hours = match[2] ? parseFloat(match[2]) : 0
+			const mins = match[3] ? parseInt(match[3], 10) : 0
+			minutes = Math.round(days * 24 * 60 + hours * 60 + mins)
 		}
 	}
 
@@ -47,15 +51,20 @@ export function formatDuration(minutes) {
 	if (!minutes || minutes <= 0) {
 		return ''
 	}
-	const hours = Math.floor(minutes / 60)
+	const days = Math.floor(minutes / 1440)
+	const hours = Math.floor((minutes % 1440) / 60)
 	const mins = minutes % 60
-	if (hours === 0) {
-		return `${mins}m`
+	const parts = []
+	if (days) {
+		parts.push(`${days}d`)
 	}
-	if (mins === 0) {
-		return `${hours}h`
+	if (hours) {
+		parts.push(`${hours}h`)
 	}
-	return `${hours}h ${mins}m`
+	if (mins) {
+		parts.push(`${mins}m`)
+	}
+	return parts.join(' ')
 }
 
 export const DURATION_PRESETS = [

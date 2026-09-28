@@ -4,7 +4,7 @@
 			:model-value="text"
 			:disabled="disabled"
 			label="Duration"
-			placeholder="e.g. 1h30"
+			placeholder="e.g. 1h30 or 1d"
 			@update:model-value="onInput" />
 		<div class="duration-input__presets">
 			<NcButton

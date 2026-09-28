@@ -73,7 +73,7 @@ Deck cards have both a **start date** (`startdate`) and a **due date** (`duedate
 
 ### Setting a duration
 
-Besides dragging, a card's length can be typed in as a **duration**. The field appears in the card editor panel, in quick-add and in the backlog. It accepts `90m`, `1h30`, `1:30` or `1.5h`, and there are preset buttons (15m, 30m, 1h, 2h).
+Besides dragging, a card's length can be typed in as a **duration**. The field appears in the card editor panel, in quick-add and in the backlog. It accepts `90m`, `1h30`, `1:30`, `1.5h`, or a day-based form like `1d`, `1d2h` or `1d 2h 30m`, and there are preset buttons (15m, 30m, 1h, 2h).
 
 Deck has no duration field. The app works out the duration from the two dates and writes the result back as dates:
 

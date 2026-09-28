@@ -5,7 +5,7 @@
     <name>Day Planner</name>
     <summary>Schedule Deck cards on a day-planner timeline</summary>
     <description><![CDATA[Schedule Deck cards on a vertical time-grid timeline, in the style of Obsidian's Day Planner plugin. Drag cards from a backlog onto the timeline, resize them to set their duration, and see calendar events alongside them. The schedule lives directly on the Deck card's start and due dates, so it stays in sync with Deck everywhere else.]]></description>
-    <version>1.1.0</version>
+    <version>1.1.9</version>
     <licence>agpl</licence>
     <author>Day Planner contributors</author>
     <namespace>DayPlanner</namespace>

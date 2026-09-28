@@ -37,10 +37,12 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import NcActionButton from '@nextcloud/vue/components/NcActionButton'
 import NcActions from '@nextcloud/vue/components/NcActions'
 import NcButton from '@nextcloud/vue/components/NcButton'
+import { loadSessionState, saveSessionState } from '../services/sessionState.js'
 import { useBoardsStore } from '../store/boards.js'
 import { useCalendarsStore } from '../store/calendars.js'
 import { useCardsStore } from '../store/cards.js'
 import { usePreferencesStore } from '../store/preferences.js'
+import { formatDuration } from '../utils/duration.js'
 
 const DUE_MARKER_DISPLAY_MINUTES = 15
 const CALENDAR_REFRESH_MS = 5 * 60 * 1000
@@ -68,6 +70,7 @@ export default {
 		}
 	},
 	data() {
+		const savedView = loadSessionState('timelineView', null)
 		return {
 			visibleRange: null,
 			refreshTimer: null,
@@ -77,10 +80,19 @@ export default {
 			calendarHeight: null,
 			resizeObserver: null,
 			viewOptions: VIEW_OPTIONS,
-			currentView: VIEW_OPTIONS[0].value,
+			currentView: VIEW_OPTIONS.some((option) => option.value === savedView) ? savedView : VIEW_OPTIONS[0].value,
+			// Only read once, at mount - initialDate is a one-time FullCalendar
+			// init option, not something to keep reactively in sync.
+			initialDate: loadSessionState('timelineDate', null) ?? undefined,
 			// FullCalendar's own headerToolbar is off (see calendarOptions) -
 			// its title is mirrored here from datesSet instead.
 			title: '',
+			// The scroller element currently being tracked for save-on-scroll
+			// (see setupScrollTracking) - re-diffed on every datesSet since
+			// FullCalendar can recreate it on a view change.
+			scrollerEl: null,
+			scrollSaveTimer: null,
+			scrollRestored: false,
 		}
 	},
 	computed: {
@@ -141,6 +153,10 @@ export default {
 			return {
 				plugins: [timeGridPlugin, interactionPlugin],
 				initialView: this.currentView,
+				// One-time restore of the last-viewed date across reloads
+				// (see data()) - undefined just means "today", FullCalendar's
+				// own default.
+				initialDate: this.initialDate,
 				// Off: replaced by the toolbar in the template above, so the
 				// view switcher can be a proper popup menu (NcActions) next
 				// to Today instead of a row of buttons.
@@ -165,18 +181,16 @@ export default {
 				editable: true,
 				droppable: true,
 				selectable: true,
-				// Read-only calendar events shouldn't be select/long-press
-				// targets themselves (that's what eventClick's info dialog is
-				// for) - only reject a selection landing on one of those, not
-				// on top of a card (plan.md: cards can sit on calendar events).
-				selectOverlap: (event) => !event.extendedProps.isCalendarEvent,
-				// Cards are scheduled by time range (start/due), which the
-				// all-day row can't represent - dropping/resizing one there
-				// used to silently fail to persist and snap back on reload.
-				// Block it up front instead (covers both dragging a backlog
-				// card in and dragging/resizing an already-scheduled one).
-				eventAllow: (dropInfo) => !dropInfo.allDay,
-				selectAllow: (selectInfo) => !selectInfo.allDay,
+				// No selectOverlap/selectAllow/eventAllow here on purpose:
+				// each one, independently, was found (via a headless-browser
+				// mouse-drag test) to silently break starting a NEW
+				// drag-select entirely as soon as any event exists anywhere
+				// on the calendar - a FullCalendar bug/quirk with these
+				// constraint-callback props in this version, not a logic
+				// problem in what they returned. All-day blocking and the
+				// calendar-event-overlap rule are enforced after the fact
+				// instead, in onSelect/onEventDrop/onEventResize/
+				// onEventReceive below.
 				// Lets you drag the top edge to change the start time
 				// independently of dragging the whole card (bottom-edge
 				// resize for the due/end time already worked).
@@ -213,6 +227,7 @@ export default {
 				scrollTime: `${this.preferencesStore.workingHoursStart}:00`,
 				snapDuration: { minutes: this.preferencesStore.snapStepMinutes },
 				events: this.events,
+				eventContent: this.renderEventContent,
 				eventDrop: this.onEventDrop,
 				eventResize: this.onEventResize,
 				eventReceive: this.onEventReceive,
@@ -243,6 +258,14 @@ export default {
 			if (height) {
 				this.calendarHeight = Math.round(height)
 			}
+			// calendarOptions (and so FullCalendar's `height` option) only
+			// actually changes, prompting a redraw, when calendarHeight's
+			// VALUE changes - a width-only resize (e.g. the card editor
+			// sidebar opening/closing) leaves it untouched, and FullCalendar
+			// doesn't auto-detect a CSS-driven resize of its own container
+			// the way it does a browser window resize. Nudge it explicitly
+			// on every observed resize, not just ones that change height.
+			this.$refs.calendar?.getApi()?.updateSize()
 		})
 		// The custom toolbar (prev/next/today/view menu) is a sibling that
 		// takes its own space above the grid now - observing this wrapper
@@ -255,6 +278,8 @@ export default {
 	beforeUnmount() {
 		clearInterval(this.refreshTimer)
 		this.resizeObserver?.disconnect()
+		this.scrollerEl?.removeEventListener('scroll', this.onTimelineScroll)
+		clearTimeout(this.scrollSaveTimer)
 	},
 	methods: {
 		goPrev() {
@@ -270,17 +295,67 @@ export default {
 			this.currentView = view
 			this.$refs.calendar.getApi().changeView(view)
 		},
+		// Scheduled cards get "6:30 - 8:15 (1h 45m)" instead of FullCalendar's
+		// default "6:30 - 8:15" - calendar events and due-date markers keep
+		// the default rendering (returning true) since a duration isn't
+		// meaningful for either. Rebuilds FullCalendar's own event DOM
+		// structure (fc-event-main-frame/fc-event-time/fc-event-title) by
+		// hand rather than just editing arg.timeText, since eventContent
+		// replaces the whole content area, not just the time text.
+		renderEventContent(arg) {
+			const { event } = arg
+			if (event.extendedProps.isCalendarEvent || event.id.startsWith('due-')) {
+				return true
+			}
+			const minutes = event.start && event.end ? Math.round((event.end - event.start) / 60000) : null
+			const duration = minutes ? formatDuration(minutes) : ''
+
+			const mainFrame = document.createElement('div')
+			mainFrame.className = 'fc-event-main-frame'
+
+			if (arg.timeText) {
+				const timeEl = document.createElement('div')
+				timeEl.className = 'fc-event-time'
+				timeEl.textContent = duration ? `${arg.timeText} (${duration})` : arg.timeText
+				mainFrame.appendChild(timeEl)
+			}
+
+			const titleContainer = document.createElement('div')
+			titleContainer.className = 'fc-event-title-container'
+			const titleEl = document.createElement('div')
+			titleEl.className = 'fc-event-title fc-sticky'
+			titleEl.textContent = event.title
+			titleContainer.appendChild(titleEl)
+			mainFrame.appendChild(titleContainer)
+
+			return { domNodes: [mainFrame] }
+		},
 		onEventDrop(info) {
+			// Cards are scheduled by time range, which the all-day row can't
+			// represent - checked here rather than via eventAllow (see the
+			// comment on calendarOptions for why).
+			if (info.event.allDay) {
+				info.revert()
+				return
+			}
 			const cardId = info.event.extendedProps.cardId
 			this.cardsStore.scheduleCard(cardId, info.event.start.toISOString(), info.event.end.toISOString())
 				.catch(() => info.revert())
 		},
 		onEventResize(info) {
+			if (info.event.allDay) {
+				info.revert()
+				return
+			}
 			const cardId = info.event.extendedProps.cardId
 			this.cardsStore.scheduleCard(cardId, info.event.start.toISOString(), info.event.end.toISOString())
 				.catch(() => info.revert())
 		},
 		onEventReceive(info) {
+			if (info.event.allDay) {
+				info.event.remove()
+				return
+			}
 			const cardId = info.event.extendedProps.cardId
 			// The store's reactive `events` list renders the real event once
 			// scheduling succeeds; drop FullCalendar's own placeholder so we
@@ -297,18 +372,75 @@ export default {
 		},
 		onSelect(info) {
 			this.$refs.calendar.getApi().unselect()
+			// Same reasoning as the drop/resize/receive guards above: this
+			// used to be selectAllow, which broke drag-select entirely once
+			// any event existed.
+			if (info.allDay) {
+				return
+			}
+			// ...and this used to be selectOverlap - reject a selection that
+			// overlaps a real (timed) calendar event, but still allow it to
+			// overlap an already-scheduled card (plan.md: cards can sit on
+			// calendar events).
+			const overlapsCalendarEvent = this.calendarEvents.some((event) => {
+				if (event.allDay) {
+					return false
+				}
+				return info.start < new Date(event.end) && info.end > new Date(event.start)
+			})
+			if (overlapsCalendarEvent) {
+				return
+			}
 			this.$emit('quick-add', { start: info.start, end: info.end })
 		},
 		onDatesSet(info) {
 			this.visibleRange = { start: info.start, end: info.end }
 			this.title = info.view.title
 			this.currentView = info.view.type
+			saveSessionState('timelineView', info.view.type)
+			saveSessionState('timelineDate', info.start.toISOString())
 			this.reloadCalendarEvents()
 			this.$nextTick(() => requestAnimationFrame(() => this.syncAllDayRowHeight()))
+			this.$nextTick(() => requestAnimationFrame(() => {
+				this.setupScrollTracking()
+				this.restoreScrollOnce()
+			}))
 		},
 		reloadCalendarEvents() {
 			if (this.visibleRange) {
 				this.calendarsStore.loadEvents(this.visibleRange.start, this.visibleRange.end)
+			}
+		},
+		// FullCalendar can recreate the scroller element on a view change, so
+		// this re-diffs on every datesSet rather than attaching once in
+		// mounted(). Save-on-scroll rather than only on unmount/navigation,
+		// since the tab can just be closed without either of those firing.
+		setupScrollTracking() {
+			const scroller = this.$refs.root?.querySelector('.fc-scroller-liquid-absolute')
+			if (!scroller || scroller === this.scrollerEl) {
+				return
+			}
+			this.scrollerEl?.removeEventListener('scroll', this.onTimelineScroll)
+			this.scrollerEl = scroller
+			scroller.addEventListener('scroll', this.onTimelineScroll, { passive: true })
+		},
+		onTimelineScroll() {
+			clearTimeout(this.scrollSaveTimer)
+			this.scrollSaveTimer = setTimeout(() => {
+				saveSessionState('timelineScroll', this.scrollerEl.scrollTop)
+			}, 200)
+		},
+		// Once per page load, not once per datesSet - this restores where you
+		// left off on reload, not on every date/view navigation afterward
+		// (which would just fight your own scrolling).
+		restoreScrollOnce() {
+			if (this.scrollRestored) {
+				return
+			}
+			this.scrollRestored = true
+			const savedScroll = loadSessionState('timelineScroll', null)
+			if (savedScroll !== null && this.scrollerEl) {
+				this.scrollerEl.scrollTop = savedScroll
 			}
 		},
 		// Gives the all-day row a default height matching one hour of the
@@ -409,7 +541,16 @@ export default {
 	font-weight: bold;
 }
 
-.dayplanner-event--done {
+/* .fc-event.dayplanner-event--done (not just .dayplanner-event--done) is
+   needed to outrank FullCalendar's own `a.fc-event { text-decoration:
+   none }` and Nextcloud's global `a { text-decoration: none }` - both
+   apply here since FullCalendar renders each event as an <a>, and both
+   have higher specificity than a single class selector. The :hover
+   variant needs the same treatment separately, to outrank FullCalendar's
+   OWN `a.fc-event:hover { text-decoration: none }` (hovering was
+   reverting the strike-through otherwise). */
+.fc-event.dayplanner-event--done,
+.fc-event.dayplanner-event--done:hover {
 	opacity: 0.5;
 	text-decoration: line-through;
 }

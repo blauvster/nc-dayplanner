@@ -19,16 +19,58 @@ a runtime requirement that it's installed and enabled.
 - Move/resize on the timeline writes straight back to the card's Deck
   `startdate`/`duedate` - no separate database, the schedule lives on the
   card itself
-- Full card editor: title, done, dates, duration, Markdown description
-  with preview, labels, assignees, move between boards/lists, archive,
-  delete, plus comments and attachments
-- Backlog filters (list, label, assigned-to-me, due-soon) and due-date
-  markers for cards that only have a due date
+- Full card editor: title, done, dates, duration (including multi-day,
+  e.g. `1d 2h 30m`), Markdown description with preview, labels, assignees,
+  move between boards/lists, archive, delete, plus comments and
+  attachments
+- Backlog filters (multi-select by list/label, assigned-to-me, due-soon),
+  each collapsible, with your selections remembered across reloads
+- Due-date markers for backlog cards that only have a due date
 - Read-only calendar events shown alongside cards, from any of your
   CalDAV calendars
 - Personal settings for working hours, snap step and default duration
   (Settings → Personal → Day Planner)
 - A "Today's plan" Dashboard widget
+- Touch-first: long-press to drag/resize, and the view mode, current date
+  and scroll position all persist across reloads
+
+## Screenshots
+
+**Day view** - cards from different boards color-coded, a completed card
+struck through, each card's time range and total duration, and a
+multi-day card spanning past midnight:
+
+![Day view](screenshots/day-view.png)
+
+**Week view** - a due-date-only marker (dashed outline) and a read-only
+calendar event (diagonal stripes) alongside scheduled cards:
+
+![Week view](screenshots/week-view.png)
+
+**Backlog filters** - expandable, multi-select by list or label, plus
+assigned-to-me/due-soon switches; boards and calendars get their own
+expandable sections below:
+
+![Filters](screenshots/filters.png)
+
+**Card editor** - opens from clicking any card, with duration, a
+Markdown description preview, and move/archive/delete:
+
+![Card editor](screenshots/card-editor.png)
+
+**Quick add** - via the backlog's `+ Add` button or by drag-selecting a
+time range directly on the timeline:
+
+![Quick add](screenshots/quick-add.png)
+
+**Dashboard widget** - today's scheduled cards, right on your Nextcloud
+dashboard:
+
+![Dashboard widget](screenshots/dashboard-widget.png)
+
+**Mobile** - the whole app is touch-first, not just responsive:
+
+![Mobile view](screenshots/mobile-view.png)
 
 ## Known limitations
 
