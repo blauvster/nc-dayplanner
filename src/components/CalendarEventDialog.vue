@@ -31,7 +31,7 @@ export default {
 			default: null,
 		},
 	},
-	emits: ['update:open'],
+	emits: ['update:open', 'duplicate'],
 	computed: {
 		timeRange() {
 			if (!this.event) {
@@ -48,14 +48,34 @@ export default {
 				+ `${start.toLocaleTimeString(undefined, timeFormat)} - ${end.toLocaleTimeString(undefined, timeFormat)}`
 		},
 		buttons() {
-			const buttons = [{ label: 'Close', callback: () => this.$emit('update:open', false) }]
+			// No explicit "Close" button - the dialog's own × already covers
+			// that, and adding one back here just fights "Open in Calendar"
+			// and "Duplicate as card" for space on narrow screens (with 3
+			// buttons in the footer, all three ended up visually truncated).
+			const buttons = []
 			if (this.event && window.OC?.appswebroots?.calendar) {
-				const day = new Date(this.event.start).toISOString().slice(0, 10)
+				// objectId/recurrenceId (from CalendarController) jump straight
+				// to this event's own editor via Calendar's "direct edit" route;
+				// fall back to just the day view if either is missing for some
+				// reason (defensive - every backend we've tested provides them).
+				const url = (this.event.objectId && this.event.recurrenceId)
+					? generateUrl('/apps/calendar/edit/{objectId}/{recurrenceId}', {
+						objectId: this.event.objectId,
+						recurrenceId: this.event.recurrenceId,
+					})
+					: generateUrl('/apps/calendar/timeGridDay/{day}', {
+						day: new Date(this.event.start).toISOString().slice(0, 10),
+					})
 				buttons.push({
 					label: 'Open in Calendar',
-					callback: () => {
-						window.open(generateUrl('/apps/calendar/timeGridDay/{day}', { day }), '_blank')
-					},
+					callback: () => window.open(url, '_blank'),
+				})
+			}
+			if (this.event) {
+				buttons.push({
+					label: 'Duplicate as card',
+					variant: 'primary',
+					callback: () => this.$emit('duplicate', this.event),
 				})
 			}
 			return buttons

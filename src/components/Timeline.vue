@@ -52,6 +52,22 @@ const VIEW_OPTIONS = [
 	{ value: 'timeGridWeek', label: 'Week' },
 ]
 
+/**
+ * A translucent tint of the calendar's own color, so overlapping calendar
+ * events (which FullCalendar fans into side-by-side columns like any
+ * other event, but used to all look like the same grey diagonal-stripe
+ * pattern) are distinguishable by hue instead of blurring into a single
+ * crosshatched mass.
+ */
+function tintFromHex(hex, alpha) {
+	const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex ?? '')
+	if (!match) {
+		return 'transparent'
+	}
+	const [, r, g, b] = match
+	return `rgba(${parseInt(r, 16)}, ${parseInt(g, 16)}, ${parseInt(b, 16)}, ${alpha})`
+}
+
 export default {
 	name: 'Timeline',
 	components: {
@@ -133,7 +149,7 @@ export default {
 				start: event.start,
 				end: event.end,
 				allDay: event.allDay,
-				backgroundColor: 'transparent',
+				backgroundColor: tintFromHex(event.color, 0.35),
 				borderColor: event.color,
 				textColor: 'var(--color-main-text)',
 				editable: false,
@@ -378,19 +394,11 @@ export default {
 			if (info.allDay) {
 				return
 			}
-			// ...and this used to be selectOverlap - reject a selection that
-			// overlaps a real (timed) calendar event, but still allow it to
-			// overlap an already-scheduled card (plan.md: cards can sit on
-			// calendar events).
-			const overlapsCalendarEvent = this.calendarEvents.some((event) => {
-				if (event.allDay) {
-					return false
-				}
-				return info.start < new Date(event.end) && info.end > new Date(event.start)
-			})
-			if (overlapsCalendarEvent) {
-				return
-			}
+			// A selection overlapping a calendar event used to be silently
+			// rejected here (this used to be selectOverlap) - with no
+			// feedback, that just looked like drag-select randomly not
+			// working. Cards can already sit on top of calendar events once
+			// scheduled, so let quick-add create one the same way.
 			this.$emit('quick-add', { start: info.start, end: info.end })
 		},
 		onDatesSet(info) {
@@ -564,13 +572,14 @@ export default {
 .dayplanner-event--calendar {
 	border-width: 2px;
 	border-style: solid;
-	background-image: repeating-linear-gradient(
-		45deg,
-		var(--color-background-hover),
-		var(--color-background-hover) 4px,
-		transparent 4px,
-		transparent 8px
-	);
+	/* The diagonal-stripe pattern this used to have (instead of a plain
+	   fill) turned into unreadable crosshatch noise wherever two or more
+	   calendar events overlapped - FullCalendar fans them into side-by-side
+	   columns same as any other event, but every column had the identical
+	   grey pattern layered on top of each other's, with no way to tell
+	   which stripes belonged to which event. A solid, per-calendar-colored
+	   tint (see tintFromHex, applied as backgroundColor above) reads
+	   clearly at any number of overlaps instead. */
 	/* Read-only: suppress the browser's default tap-highlight so a short
 	   press doesn't visually look like it "selected" the event before
 	   eventClick's info dialog opens. */

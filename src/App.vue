@@ -22,11 +22,13 @@
 			v-model:open="quickAddOpen"
 			:initial-start="quickAddStart"
 			:initial-end="quickAddEnd"
+			:initial-title="quickAddTitle"
 			@created="selectedCardId = $event.id" />
 		<CalendarEventDialog
 			:open="selectedCalendarEvent !== null"
 			:event="selectedCalendarEvent"
-			@update:open="selectedCalendarEvent = null" />
+			@update:open="selectedCalendarEvent = null"
+			@duplicate="onDuplicateCalendarEvent" />
 	</NcContent>
 </template>
 
@@ -77,6 +79,7 @@ export default {
 			quickAddOpen: false,
 			quickAddStart: null,
 			quickAddEnd: null,
+			quickAddTitle: '',
 		}
 	},
 	watch: {
@@ -99,6 +102,14 @@ export default {
 		openQuickAdd(range) {
 			this.quickAddStart = range?.start ?? null
 			this.quickAddEnd = range?.end ?? null
+			this.quickAddTitle = ''
+			this.quickAddOpen = true
+		},
+		onDuplicateCalendarEvent(event) {
+			this.selectedCalendarEvent = null
+			this.quickAddStart = new Date(event.start)
+			this.quickAddEnd = new Date(event.end)
+			this.quickAddTitle = event.title
 			this.quickAddOpen = true
 		},
 	},

@@ -78,8 +78,9 @@ class CalendarController extends Controller {
 			]);
 
 			foreach ($results as $result) {
+				$objectUri = $result['uri'] ?? null;
 				foreach ($result['objects'] as $object) {
-					$event = $this->toEvent($object, $calendar);
+					$event = $this->toEvent($object, $calendar, $objectUri);
 					if ($event !== null) {
 						$events[] = $event;
 					}
@@ -97,8 +98,14 @@ class CalendarController extends Controller {
 	 * @param array $object one expanded VEVENT, as returned by
 	 *                      ICalendar::search() - see OCP\Calendar\IManager
 	 *                      for the raw shape.
+	 * @param ?string $objectUri the underlying calendar object's filename
+	 *                           (e.g. "abc123.ics"), used to build a direct
+	 *                           link to the Calendar app's editor for this
+	 *                           event - null if the search result didn't
+	 *                           carry a 'uri' (defensive; every backend
+	 *                           we've seen returns one).
 	 */
-	private function toEvent(array $object, ICalendar $calendar): ?array {
+	private function toEvent(array $object, ICalendar $calendar, ?string $objectUri): ?array {
 		if (!isset($object['DTSTART'])) {
 			return null;
 		}
@@ -123,6 +130,16 @@ class CalendarController extends Controller {
 
 		$uid = $object['UID'][0] ?? $calendar->getUri();
 
+		// The Calendar app's "direct edit" route (/apps/calendar/edit/{objectId}/{recurrenceId})
+		// takes a base64-encoded CalDAV object path and the occurrence's
+		// start time as a Unix timestamp - reverse-engineered by watching
+		// what URL Calendar's own UI navigates to when you click an event,
+		// since this isn't documented anywhere. Lets "Open in Calendar"
+		// jump straight to that event's editor instead of just the day view.
+		$objectId = $objectUri !== null
+			? base64_encode('/remote.php/dav/calendars/' . $this->userId . '/' . $calendar->getUri() . '/' . $objectUri)
+			: null;
+
 		return [
 			'id' => $uid . '-' . $start->getTimestamp(),
 			'title' => $object['SUMMARY'][0] ?? '(No title)',
@@ -132,6 +149,8 @@ class CalendarController extends Controller {
 			'location' => $object['LOCATION'][0] ?? null,
 			'calendarUri' => $calendar->getUri(),
 			'color' => $calendar->getDisplayColor() ?? '#0082c9',
+			'objectId' => $objectId,
+			'recurrenceId' => $start->getTimestamp(),
 		];
 	}
 }

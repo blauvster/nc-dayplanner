@@ -21,6 +21,19 @@ docker ps --format '{{.Names}}' | grep -qx "$CONTAINER" || {
 	exit 1
 }
 
+occ_needs_upgrade() {
+	docker exec --user www-data "$CONTAINER" php occ status 2>&1 | grep -q "needsDbUpgrade: true"
+}
+
+# A pending upgrade (core, or another app's un-run migration) is a much
+# bigger, riskier operation than installing an app - this script won't
+# trigger one for you, just refuse to proceed on top of one.
+if occ_needs_upgrade; then
+	echo "Nextcloud already has a pending upgrade. Run this first, then re-run this script:" >&2
+	echo "  docker exec --user www-data $CONTAINER php occ upgrade" >&2
+	exit 1
+fi
+
 . "$SCRIPT_DIR/_build.sh"
 build_app "$REPO_DIR"
 
@@ -38,6 +51,17 @@ docker exec --user www-data "$CONTAINER" php occ app:enable "$APP_ID"
 if ! docker exec --user www-data "$CONTAINER" php occ app:list | grep -q '^  - deck:'; then
 	echo "Note: the Deck app isn't enabled yet, and Day Planner needs it:" >&2
 	echo "  docker exec --user www-data $CONTAINER php occ app:install deck" >&2
+fi
+
+# A version bump between releases registers a pending migration for
+# Nextcloud to run, which blocks the web UI (with a "command line updater"
+# message) until `occ upgrade` runs - same as any other app update. Tell
+# the user right away instead of leaving them to discover this cold.
+if occ_needs_upgrade; then
+	echo "" >&2
+	echo "This update needs Nextcloud to finish applying it before the web UI works again. Run:" >&2
+	echo "  docker exec --user www-data $CONTAINER php occ upgrade" >&2
+	exit 1
 fi
 
 echo "Done - Day Planner is installed and enabled in $CONTAINER."

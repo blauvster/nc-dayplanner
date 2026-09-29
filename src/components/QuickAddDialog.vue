@@ -64,6 +64,10 @@ export default {
 			type: Date,
 			default: null,
 		},
+		initialTitle: {
+			type: String,
+			default: '',
+		},
 	},
 	emits: ['update:open', 'created'],
 	setup() {
@@ -111,7 +115,7 @@ export default {
 	},
 	methods: {
 		reset() {
-			this.title = ''
+			this.title = this.initialTitle
 			const lastDestination = loadSessionState('lastQuickAddDestination', {})
 			const availableBoardIds = this.boardsStore.selectedBoards.map((board) => board.id)
 			this.selectedBoardId = availableBoardIds.includes(lastDestination.boardId)
